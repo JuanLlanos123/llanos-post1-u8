@@ -1,18 +1,22 @@
 package com.example.auditoria.adapter.out.persistence;
 
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+import java.util.Map;
 import org.springframework.stereotype.Component;
 
-import java.util.Optional;
+
 import com.example.auditoria.domain.entity.HallazgoAuditoria;
-import com.example.auditoria.domain.valueobject.EstadoHallazgo;
+
 import com.example.auditoria.domain.valueobject.HallazgoId;
 import com.example.auditoria.domain.valueobject.PlanRemediacion;
+import com.example.auditoria.usecase.port.ConteoCategoria;
 import com.example.auditoria.usecase.port.HallazgoRepositoryPort;
+import com.example.auditoria.usecase.port.PromedioCategoria;
 @Component 
 public class HallazgoRepositoryAdapter implements HallazgoRepositoryPort{
     private final HallazgoJpaRepository jpa;
@@ -86,5 +90,49 @@ public class HallazgoRepositoryAdapter implements HallazgoRepositoryPort{
         }
         return e;
     }
-    
+
+
+    @Override
+    public List<ConteoCategoria> contarPorSeveridad() {
+        return StreamSupport.stream(jpa.findAll().spliterator(), false)
+        .collect(Collectors.groupingBy(
+            e -> e.getSeveridad().name(),
+            Collectors.counting()
+        ))
+        .entrySet()
+        .stream()
+        .map(e -> new ConteoCategoria(e.getKey(), e.getValue()))
+        .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<ConteoCategoria> contarPorEstado() {
+    return StreamSupport.stream(jpa.findAll().spliterator(), false)
+        .collect(Collectors.groupingBy(
+            e -> e.getEstado().name(),
+            Collectors.counting()
+        ))
+        .entrySet()
+        .stream()
+        .map(e -> new ConteoCategoria(e.getKey(), e.getValue()))
+        .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<PromedioCategoria> promedioDiasCierrePorArea() {
+        Map<String, Double> promedios = StreamSupport
+        .stream(jpa.findAll().spliterator(), false)
+        .filter(e -> e.getFechaCierre() != null)
+        .collect(Collectors.groupingBy(
+            HallazgoJpaEntity::getAreaResponsable,
+            Collectors.averagingLong(e ->
+                ChronoUnit.DAYS.between(e.getFechaDeteccion(), e.getFechaCierre())
+            )
+        ));
+
+        return promedios.entrySet()
+        .stream()
+        .map(e -> new PromedioCategoria(e.getKey(), e.getValue()))
+        .collect(Collectors.toList());
+    }
 }
